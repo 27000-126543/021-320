@@ -19,7 +19,7 @@ const HiatusRecordPage: React.FC = () => {
   const [tab, setTab] = useState<TabType>('active');
 
   const init = useMangaStore(s => s.init);
-  const hiatusRecords = useMangaStore(s => s.hiatusRecords);
+  const getHiatusByStatus = useMangaStore(s => s.getHiatusByStatus);
   const getMangaById = useMangaStore(s => s.getMangaById);
   const removeHiatus = useMangaStore(s => s.removeHiatus);
 
@@ -35,7 +35,9 @@ const HiatusRecordPage: React.FC = () => {
   today.setHours(0, 0, 0, 0);
   const todayStr = formatDate(today);
 
-  const enrichedRecords: EnrichedHiatus[] = hiatusRecords.map(record => {
+  const allHiatusRecords = getHiatusByStatus('all');
+
+  const enrichedRecords: EnrichedHiatus[] = allHiatusRecords.map(record => {
     const manga = getMangaById(record.mangaId);
     const startDate = parseDate(record.startWeekDate);
     const endDate = addWeeks(startDate, record.weeksCount);
@@ -59,9 +61,11 @@ const HiatusRecordPage: React.FC = () => {
   const expiredCount = enrichedRecords.filter(r => r.status === 'expired').length;
   const totalWeeks = enrichedRecords.reduce((sum, r) => sum + r.weeksCount, 0);
 
-  const displayedRecords = tab === 'all'
-    ? enrichedRecords
-    : enrichedRecords.filter(r => r.status === tab);
+  const displayedRecords = (() => {
+    if (tab === 'all') return enrichedRecords;
+    if (tab === 'history') return enrichedRecords.filter(r => r.status === 'expired');
+    return enrichedRecords.filter(r => r.status === 'active' || r.status === 'upcoming');
+  })();
 
   const handleDelete = (id: string, mangaName: string) => {
     Taro.showModal({
@@ -147,7 +151,7 @@ const HiatusRecordPage: React.FC = () => {
           className={classnames(styles.tab, tab === 'history' && styles.active)}
           onClick={() => setTab('history')}
         >
-          历史记录
+          历史记录 {expiredCount > 0 && `(${expiredCount})`}
         </Text>
         <Text
           className={classnames(styles.tab, tab === 'all' && styles.active)}

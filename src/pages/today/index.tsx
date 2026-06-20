@@ -3,6 +3,7 @@ import { View, Text, Button, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import TodayItem from '../../components/TodayItem';
+import ResumingAlert from '../../components/ResumingAlert';
 import { useMangaStore } from '../../store/useMangaStore';
 import { formatDate } from '../../utils/date';
 import { WEEKDAY_LABELS, UPDATE_TYPE_MAP } from '../../types/manga';
@@ -10,9 +11,8 @@ import { WEEKDAY_LABELS, UPDATE_TYPE_MAP } from '../../types/manga';
 const TodayPage: React.FC = () => {
   const init = useMangaStore(s => s.init);
   const mangas = useMangaStore(s => s.mangas);
-  const getEffectiveNextUpdateDate = useMangaStore(s => s.getEffectiveNextUpdateDate);
-  const isMangaInHiatus = useMangaStore(s => s.isMangaInHiatus);
-  const getTodayMangas = useMangaStore(s => s.getTodayMangas);
+  const getTodayNominalMangas = useMangaStore(s => s.getTodayNominalMangas);
+  const getResumingTomorrow = useMangaStore(s => s.getResumingTomorrow);
 
   useEffect(() => {
     init();
@@ -23,10 +23,11 @@ const TodayPage: React.FC = () => {
   });
 
   const todayStr = formatDate(new Date());
-  const todayMangas = getTodayMangas().sort((a, b) => a.updateTime.localeCompare(b.updateTime));
+  const todayList = getTodayNominalMangas();
+  const resumingTomorrow = getResumingTomorrow();
 
-  const inHiatusCount = todayMangas.filter(m => isMangaInHiatus(m.id, todayStr)).length;
-  const normalCount = todayMangas.length - inHiatusCount;
+  const inHiatusCount = todayList.filter(t => t.status === 'hiatus').length;
+  const normalCount = todayList.filter(t => t.status === 'normal').length;
 
   const totalUnread = mangas.reduce((sum, m) =>
     sum + Math.max(0, m.currentChapter - m.lastReadChapter), 0
@@ -37,15 +38,15 @@ const TodayPage: React.FC = () => {
   };
 
   return (
-    <View className={styles.page}>
+    <ScrollView className={styles.page} scrollY>
       <View className={styles.heroCard}>
         <View className={styles.heroTop}>
           <Text className={styles.dateText}>{todayStr}</Text>
           <Text className={styles.weekdayBadge}>{WEEKDAY_LABELS[new Date().getDay()]}</Text>
         </View>
         <View className={styles.heroMain}>
-          <Text className={styles.heroCount}>{todayMangas.length}</Text>
-          <Text className={styles.heroLabel}>部作品今天有更新</Text>
+          <Text className={styles.heroCount}>{todayList.length}</Text>
+          <Text className={styles.heroLabel}>部作品原定今日更新</Text>
         </View>
         <View className={styles.statsRow}>
           <View className={styles.statItem}>
@@ -63,6 +64,10 @@ const TodayPage: React.FC = () => {
         </View>
       </View>
 
+      {resumingTomorrow.length > 0 && (
+        <ResumingAlert resumingList={resumingTomorrow} />
+      )}
+
       <View className={styles.typeLegend}>
         {Object.entries(UPDATE_TYPE_MAP).map(([type, cfg]) => (
           <View key={type} className={styles.legendItem}>
@@ -79,10 +84,15 @@ const TodayPage: React.FC = () => {
         <Text className={styles.sectionTitle}>今日列表</Text>
       </View>
 
-      {todayMangas.length > 0 ? (
+      {todayList.length > 0 ? (
         <View className={styles.todayList}>
-          {todayMangas.map(manga => (
-            <TodayItem key={manga.id} manga={manga} />
+          {todayList.map(item => (
+            <TodayItem
+              key={item.manga.id}
+              manga={item.manga}
+              status={item.status}
+              resumeDate={item.resumeDate}
+            />
           ))}
         </View>
       ) : (

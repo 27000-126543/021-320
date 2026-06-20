@@ -4,6 +4,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import WeekCalendar from '../../components/WeekCalendar';
 import MangaCard from '../../components/MangaCard';
+import ResumingAlert from '../../components/ResumingAlert';
 import { WEEKDAY_LABELS } from '../../types/manga';
 import { useMangaStore } from '../../store/useMangaStore';
 import { formatDate, getDateDisplay } from '../../utils/date';
@@ -15,6 +16,7 @@ const CalendarPage: React.FC = () => {
   const getMangasByWeekday = useMangaStore(s => s.getMangasByWeekday);
   const getEffectiveNextUpdateDate = useMangaStore(s => s.getEffectiveNextUpdateDate);
   const isMangaInHiatus = useMangaStore(s => s.isMangaInHiatus);
+  const getResumingTomorrow = useMangaStore(s => s.getResumingTomorrow);
 
   useEffect(() => {
     init();
@@ -33,6 +35,8 @@ const CalendarPage: React.FC = () => {
   const sortedMangas = [...selectedMangas].sort((a, b) =>
     a.updateTime.localeCompare(b.updateTime)
   );
+
+  const resumingTomorrow = getResumingTomorrow();
 
   const todayMangasCount = mangas.filter(m => {
     const effDate = getEffectiveNextUpdateDate(m);
@@ -97,6 +101,10 @@ const CalendarPage: React.FC = () => {
           onSelectWeekday={setSelectedWeekday}
           weekdayCounts={weekdayCounts}
         />
+
+        {resumingTomorrow.length > 0 && (
+          <ResumingAlert resumingList={resumingTomorrow} />
+        )}
 
         <View className={styles.sectionHeader}>
           <Text className={styles.sectionTitle}>{WEEKDAY_LABELS[selectedWeekday]}更新</Text>

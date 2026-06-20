@@ -275,6 +275,64 @@
   color: $color-text-tertiary;
 }
 
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.historyItem {
+  display: flex;
+  padding: $spacing-md;
+  background: $color-bg-page;
+  border-radius: $radius-md;
+}
+
+.historyDot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  margin-top: 10rpx;
+  margin-right: $spacing-md;
+  flex-shrink: 0;
+}
+
+.historyInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.historyMain {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: 4rpx;
+}
+
+.historyType {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+}
+
+.historyChapter {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.historyDate {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-bottom: 4rpx;
+}
+
+.historyNote {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+}
+
 .noteBox {
   padding: $spacing-md;
   background: $color-bg-page;

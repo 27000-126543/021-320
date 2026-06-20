@@ -1,12 +1,22 @@
 import { create } from 'zustand';
-import type { Manga, HiatusRecord, UpdateType } from '../types/manga';
+import type { Manga, HiatusRecord, UpdateType, ReadHistory } from '../types/manga';
 import { storage, mangaStorage } from '../utils/storage';
-import { generateId, formatDate, getWeekdayOfNextN, addWeeks, parseDate, addDays } from '../utils/date';
+import { generateId, formatDate, getWeekdayOfNextN, addWeeks, parseDate, addDays, addWeeks as _addWeeks } from '../utils/date';
 import { mockMangas, mockHiatusRecords } from '../data/mockMangas';
+
+const READ_HISTORY_KEY = 'manga_tracker_read_history';
+
+export interface ResumingInfo {
+  record: HiatusRecord;
+  manga: Manga;
+  resumeDate: string;
+  weeksCount: number;
+}
 
 interface MangaState {
   mangas: Manga[];
   hiatusRecords: HiatusRecord[];
+  readHistories: ReadHistory[];
   initialized: boolean;
 
   init: () => void;
@@ -14,21 +24,30 @@ interface MangaState {
   updateManga: (id: string, data: Partial<Manga>) => void;
   deleteManga: (id: string) => void;
 
-  markAsRead: (id: string, type: UpdateType) => void;
+  markAsRead: (id: string, type: UpdateType, note?: string) => void;
+  addReadHistory: (history: Omit<ReadHistory, 'id'>) => void;
+  getReadHistoryByMangaId: (mangaId: string) => ReadHistory[];
+
   addHiatus: (data: Omit<HiatusRecord, 'id' | 'createdAt'>) => void;
   removeHiatus: (id: string) => void;
 
   getMangasByWeekday: (weekday: number) => Manga[];
   getTodayMangas: () => Manga[];
+  getTodayNominalMangas: () => { manga: Manga; status: 'normal' | 'hiatus'; resumeDate?: string }[];
+  getResumingTomorrow: () => ResumingInfo[];
   getUpcomingHiatus: () => HiatusRecord[];
+  getExpiredHiatus: () => HiatusRecord[];
+  getHiatusByStatus: (status: 'active' | 'expired' | 'all') => HiatusRecord[];
   getMangaById: (id: string) => Manga | undefined;
   isMangaInHiatus: (mangaId: string, dateStr: string) => boolean;
+  getActiveHiatusForManga: (mangaId: string) => HiatusRecord | undefined;
   getEffectiveNextUpdateDate: (manga: Manga) => string;
 }
 
 export const useMangaStore = create<MangaState>((set, get) => ({
   mangas: [],
   hiatusRecords: [],
+  readHistories: [],
   initialized: false,
 
   init: () => {
@@ -37,17 +56,20 @@ export const useMangaStore = create<MangaState>((set, get) => ({
 
     let storedMangas = storage.get<Manga[]>(mangaStorage.getKey(), []);
     let storedHiatus = storage.get<HiatusRecord[]>(mangaStorage.getHiatusKey(), []);
+    let storedHistories = storage.get<ReadHistory[]>(READ_HISTORY_KEY, []);
 
     if (storedMangas.length === 0) {
       storedMangas = mockMangas;
       storedHiatus = mockHiatusRecords;
       storage.set(mangaStorage.getKey(), storedMangas);
       storage.set(mangaStorage.getHiatusKey(), storedHiatus);
+      storage.set(READ_HISTORY_KEY, storedHistories);
     }
 
     set({
       mangas: storedMangas,
       hiatusRecords: storedHiatus,
+      readHistories: storedHistories,
       initialized: false
     });
 
@@ -59,9 +81,14 @@ export const useMangaStore = create<MangaState>((set, get) => ({
     set({
       mangas: updatedMangas,
       hiatusRecords: storedHiatus,
+      readHistories: storedHistories,
       initialized: true
     });
-    console.log('[MangaStore] initialized', { mangas: updatedMangas.length, hiatus: storedHiatus.length });
+    console.log('[MangaStore] initialized', {
+      mangas: updatedMangas.length,
+      hiatus: storedHiatus.length,
+      histories: storedHistories.length
+    });
   },
 
   addManga: (data) => {
@@ -95,15 +122,32 @@ export const useMangaStore = create<MangaState>((set, get) => ({
   deleteManga: (id) => {
     const mangas = get().mangas.filter(m => m.id !== id);
     const hiatusRecords = get().hiatusRecords.filter(h => h.mangaId !== id);
-    set({ mangas, hiatusRecords });
+    const readHistories = get().readHistories.filter(h => h.mangaId !== id);
+    set({ mangas, hiatusRecords, readHistories });
     storage.set(mangaStorage.getKey(), mangas);
     storage.set(mangaStorage.getHiatusKey(), hiatusRecords);
+    storage.set(READ_HISTORY_KEY, readHistories);
     console.log('[MangaStore] deleteManga:', id);
   },
 
-  markAsRead: (id, type) => {
+  markAsRead: (id, type, note) => {
     const today = formatDate(new Date());
-    const mangas = get().mangas.map(m => {
+    const state = get();
+    const manga = state.mangas.find(m => m.id === id);
+    if (manga && type !== 'hiatus') {
+      let recordChapter = manga.currentChapter;
+      if (type === 'bonus') {
+        recordChapter = manga.currentChapter + 1;
+      }
+      state.addReadHistory({
+        mangaId: id,
+        chapter: recordChapter,
+        type,
+        date: today,
+        note
+      });
+    }
+    const mangas = state.mangas.map(m => {
       if (m.id === id) {
         let newCurrent = m.currentChapter;
         let newLastRead = m.lastReadChapter;
@@ -120,7 +164,7 @@ export const useMangaStore = create<MangaState>((set, get) => ({
           lastUpdateType: type,
           currentChapter: newCurrent
         };
-        updated.nextUpdateDate = get().getEffectiveNextUpdateDate(updated);
+        updated.nextUpdateDate = state.getEffectiveNextUpdateDate(updated);
         return updated;
       }
       return m;
@@ -128,6 +172,23 @@ export const useMangaStore = create<MangaState>((set, get) => ({
     set({ mangas });
     storage.set(mangaStorage.getKey(), mangas);
     console.log('[MangaStore] markAsRead:', id, type);
+  },
+
+  addReadHistory: (history) => {
+    const newHistory: ReadHistory = {
+      ...history,
+      id: generateId()
+    };
+    const readHistories = [...get().readHistories, newHistory];
+    set({ readHistories });
+    storage.set(READ_HISTORY_KEY, readHistories);
+    console.log('[MangaStore] addReadHistory:', newHistory.id);
+  },
+
+  getReadHistoryByMangaId: (mangaId) => {
+    return get().readHistories
+      .filter(h => h.mangaId === mangaId)
+      .sort((a, b) => b.date.localeCompare(a.date));
   },
 
   addHiatus: (data) => {
@@ -187,13 +248,87 @@ export const useMangaStore = create<MangaState>((set, get) => ({
     });
   },
 
+  getTodayNominalMangas: () => {
+    const todayWeekday = new Date().getDay();
+    const today = formatDate(new Date());
+    const state = get();
+    const result: { manga: Manga; status: 'normal' | 'hiatus'; resumeDate?: string }[] = [];
+
+    state.mangas.forEach(manga => {
+      if (manga.weekday !== todayWeekday) return;
+
+      const effectiveDate = state.getEffectiveNextUpdateDate(manga);
+      if (effectiveDate === today) {
+        result.push({ manga, status: 'normal' });
+      } else if (state.isMangaInHiatus(manga.id, today)) {
+        result.push({ manga, status: 'hiatus', resumeDate: effectiveDate });
+      }
+    });
+
+    return result.sort((a, b) => a.manga.updateTime.localeCompare(b.manga.updateTime));
+  },
+
+  getResumingTomorrow: () => {
+    const today = new Date();
+    const tomorrow = addDays(today, 1);
+    const tomorrowStr = formatDate(tomorrow);
+    const state = get();
+    const result: ResumingInfo[] = [];
+
+    state.hiatusRecords.forEach(record => {
+      const endDate = addDays(addWeeks(parseDate(record.startWeekDate), record.weeksCount), -1);
+      const endDateStr = formatDate(endDate);
+      if (endDateStr === tomorrowStr) {
+        const manga = state.mangas.find(m => m.id === record.mangaId);
+        if (manga) {
+          const resumeDate = formatDate(addDays(tomorrow, 0));
+          result.push({
+            record,
+            manga,
+            resumeDate,
+            weeksCount: record.weeksCount
+          });
+        }
+      }
+    });
+
+    return result;
+  },
+
   getUpcomingHiatus: () => {
     const today = formatDate(new Date());
+    const todayDate = parseDate(today);
     return get().hiatusRecords.filter(h => {
       const startDate = parseDate(h.startWeekDate);
       const endDate = addWeeks(startDate, h.weeksCount);
-      const todayDate = parseDate(today);
       return todayDate <= endDate;
+    });
+  },
+
+  getExpiredHiatus: () => {
+    const today = formatDate(new Date());
+    const todayDate = parseDate(today);
+    return get().hiatusRecords.filter(h => {
+      const endDate = addDays(addWeeks(parseDate(h.startWeekDate), h.weeksCount), -1);
+      return endDate < todayDate;
+    });
+  },
+
+  getHiatusByStatus: (status) => {
+    const all = get().hiatusRecords;
+    if (status === 'all') return all;
+    if (status === 'active') return get().getUpcomingHiatus();
+    return get().getExpiredHiatus();
+  },
+
+  getActiveHiatusForManga: (mangaId) => {
+    const today = formatDate(new Date());
+    const todayDate = parseDate(today);
+    return get().hiatusRecords.find(h => {
+      if (h.mangaId !== mangaId) return false;
+      const startDate = parseDate(h.startWeekDate);
+      const endDate = addDays(addWeeks(startDate, h.weeksCount), -1);
+      return todayDate >= startDate && todayDate <= endDate;
     });
   },
 

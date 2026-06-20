@@ -13,6 +13,15 @@ export interface HiatusRecord {
   createdAt: string;
 }
 
+export interface ReadHistory {
+  id: string;
+  mangaId: string;
+  chapter: number;
+  type: UpdateType;
+  date: string;
+  note?: string;
+}
+
 export interface Manga {
   id: string;
   name: string;

@@ -5,7 +5,7 @@ import classnames from 'classnames';
 import styles from './index.module.scss';
 import { useMangaStore } from '../../store/useMangaStore';
 import TagBadge from '../../components/TagBadge';
-import { WEEKDAY_LABELS, type UpdateType } from '../../types/manga';
+import { WEEKDAY_LABELS, type UpdateType, UPDATE_TYPE_MAP } from '../../types/manga';
 import {
   formatDate,
   getDateDisplay,
@@ -26,6 +26,7 @@ const MangaDetailPage: React.FC = () => {
   const hiatusRecords = useMangaStore(s => s.hiatusRecords);
   const getEffectiveNextUpdateDate = useMangaStore(s => s.getEffectiveNextUpdateDate);
   const isMangaInHiatus = useMangaStore(s => s.isMangaInHiatus);
+  const getReadHistoryByMangaId = useMangaStore(s => s.getReadHistoryByMangaId);
 
   const [showHiatusModal, setShowHiatusModal] = useState(false);
   const [hiatusWeeks, setHiatusWeeks] = useState(1);
@@ -40,6 +41,8 @@ const MangaDetailPage: React.FC = () => {
   });
 
   const manga = getMangaById(mangaId);
+  const readHistory = getReadHistoryByMangaId(mangaId);
+  const lastRead = readHistory[0];
 
   if (!manga) {
     return (
@@ -142,8 +145,14 @@ const MangaDetailPage: React.FC = () => {
               <Text className={styles.mangaPlatform} onClick={handleGoPlatform}>
                 📍 {manga.platform}
               </Text>
-              <View style={{ display: 'flex', gap: 12 }}>
+              <View style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <TagBadge type={inHiatus ? 'hiatus' : manga.lastUpdateType} size="md" />
+                {lastRead && !inHiatus && (
+                  <View style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 22, color: '#86909C' }}>上次阅读：</Text>
+                    <TagBadge type={lastRead.type} size="sm" />
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -205,6 +214,37 @@ const MangaDetailPage: React.FC = () => {
           <Text>第 {manga.currentChapter} 话</Text>
         </View>
       </View>
+
+      {readHistory.length > 0 && (
+        <View className={styles.sectionCard}>
+          <Text className={styles.sectionTitle}>阅读历史</Text>
+          <View className={styles.historyList}>
+            {readHistory.slice(0, 10).map(record => {
+              const typeCfg = UPDATE_TYPE_MAP[record.type];
+              return (
+                <View key={record.id} className={styles.historyItem}>
+                  <View
+                    className={styles.historyDot}
+                    style={{ backgroundColor: typeCfg.color }}
+                  />
+                  <View className={styles.historyInfo}>
+                    <View className={styles.historyMain}>
+                      <Text className={styles.historyType} style={{ color: typeCfg.color }}>
+                        {typeCfg.label}
+                      </Text>
+                      <Text className={styles.historyChapter}>第 {record.chapter} 话</Text>
+                    </View>
+                    <Text className={styles.historyDate}>{record.date}</Text>
+                    {record.note && (
+                      <Text className={styles.historyNote}>{record.note}</Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View className={styles.sectionCard}>
         <Text className={styles.sectionTitle}>休刊记录</Text>

@@ -1,0 +1,104 @@
+@use '@/styles/variables.scss' as *;
+
+.calendarWrapper {
+  margin: 0 (-$page-padding);
+  padding: $spacing-md $page-padding;
+  background: linear-gradient(135deg, rgba(123, 97, 255, 0.08) 0%, rgba(255, 107, 157, 0.06) 100%);
+  margin-bottom: $spacing-lg;
+}
+
+.scrollWrap {
+  @include scroll-x-container;
+  width: 100%;
+}
+
+.daysRow {
+  display: inline-flex;
+  gap: $spacing-sm;
+  padding-right: $page-padding;
+}
+
+.dayItem {
+  @include scroll-x-item(100rpx);
+  width: 100rpx;
+  padding: $spacing-md 0;
+  border-radius: $radius-lg;
+  background: $color-bg-card;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-base;
+  box-shadow: 0 2rpx 8rpx rgba(123, 97, 255, 0.06);
+
+  &.selected {
+    background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+    box-shadow: 0 4rpx 16rpx rgba(123, 97, 255, 0.3);
+
+    .weekdayLabel, .dayNum {
+      color: $color-text-white;
+    }
+
+    .countBadge {
+      background: rgba(255, 255, 255, 0.25);
+      color: $color-text-white;
+    }
+  }
+
+  &.today {
+    border: 2rpx solid $color-accent;
+
+    .weekdayLabel {
+      color: $color-accent;
+    }
+
+    .dayNum {
+      color: $color-accent;
+    }
+
+    .countBadge {
+      background: $color-accent;
+      color: $color-text-white;
+    }
+  }
+}
+
+.weekdayLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-bottom: 6rpx;
+  font-weight: $font-weight-medium;
+}
+
+.dayNum {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  line-height: 1;
+  margin-bottom: 8rpx;
+}
+
+.countBadge {
+  min-width: 40rpx;
+  height: 32rpx;
+  padding: 0 10rpx;
+  border-radius: $radius-round;
+  background: $color-bg-weekday;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  text {
+    font-size: 20rpx;
+    color: $color-text-secondary;
+    font-weight: $font-weight-semibold;
+  }
+
+  &.hasCount {
+    background: rgba(123, 97, 255, 0.12);
+
+    text {
+      color: $color-primary;
+    }
+  }
+}

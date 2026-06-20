@@ -1,0 +1,24 @@
+@use '@/styles/variables.scss' as *;
+
+.tagBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid;
+  border-radius: $radius-sm;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+  line-height: 1;
+
+  &.sm {
+    padding: 6rpx 12rpx;
+    font-size: $font-size-xs;
+    border-radius: 6rpx;
+  }
+
+  &.md {
+    padding: 8rpx 16rpx;
+    font-size: $font-size-sm;
+    border-radius: $radius-sm;
+  }
+}
